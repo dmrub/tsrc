@@ -214,7 +214,7 @@ class GitServer:
         repo = BareRepo.create(repo_path, initial_branch=branch, empty=empty)
         return repo
 
-    def add_submodule(self, name: str, *, path: str, url: str):
+    def add_submodule(self, name: str, *, path: str, url: str) -> None:
         # pygit2 does not know how to add a submodule in a bare repo, so we have
         # to do it with a non-bare repo.
 
@@ -240,7 +240,7 @@ class GitServer:
         origin = repo.remotes["origin"]
         origin.push(["refs/heads/master"])
 
-    def update_submodule(self, name: str, path: str):
+    def update_submodule(self, name: str, path: str) -> None:
         parent_path = self.src_path / name
         parent_repo = pygit2.Repository(parent_path)
 
