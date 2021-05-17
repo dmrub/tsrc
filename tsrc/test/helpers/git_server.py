@@ -185,8 +185,12 @@ class GitServer:
     """
 
     def __init__(self, tmpdir: Path) -> None:
-        self.tmpdir = tmpdir
-        self.bare_path = tmpdir / "srv"
+        srv_path = tmpdir / "srv"
+        srv_path.mkdir()
+        self.bare_path = srv_path / "bare"
+        self.src_path = srv_path / "src"
+        self.bare_path.mkdir()
+        self.src_path.mkdir()
         self.manifest_url = self.get_url("manifest")
 
         manifest_repo = self._create_repo("manifest")
@@ -209,6 +213,67 @@ class GitServer:
         repo_path.mkdir(parents=True, exist_ok=True)
         repo = BareRepo.create(repo_path, initial_branch=branch, empty=empty)
         return repo
+
+    def add_submodule(self, name: str, *, path: str, url: str):
+        # pygit2 does not know how to add a submodule in a bare repo, so we have
+        # to do it with a non-bare repo.
+
+        bare_url = self.get_url(name)
+        src_path = self.src_path / name
+        repo = pygit2.clone_repository(bare_url, src_path, checkout_branch="master")
+        repo.add_submodule(path=path, url=url)
+
+        ref = repo.references.get("refs/heads/master")
+        last_commit = repo.get(ref.target)
+        parents = [last_commit.oid]
+        user = pygit2.Signature("Tasty Test", "test@tsrc.io")
+        repo.index.add_all()
+        tree = repo.index.write_tree()
+        repo.create_commit(
+            "HEAD",
+            user,
+            user,
+            f"add subdmodule {url} in {path}",
+            tree,
+            parents,
+        )
+        origin = repo.remotes["origin"]
+        origin.push(["refs/heads/master"])
+
+    def update_submodule(self, name: str, path: str):
+        parent_path = self.src_path / name
+        parent_repo = pygit2.Repository(parent_path)
+
+        # sub_repo: fetch
+        sub_path = parent_path / path
+        sub_repo = pygit2.Repository(sub_path)
+        origin = sub_repo.remotes["origin"]
+        origin.fetch(["refs/heads/master"], prune=pygit2.GIT_FETCH_PRUNE)
+        # sub_repo: reset to origin/master
+        remote_master_id = sub_repo.lookup_reference(
+            "refs/remotes/origin/master"
+        ).target
+        master_ref = sub_repo.lookup_reference("refs/heads/master")
+        master_ref.set_target(remote_master_id)
+        sub_repo.reset(master_ref.target, pygit2.GIT_RESET_HARD)
+
+        # parent_repo: make a commit which updates the submodule
+        parent_repo.index.add_all()
+        tree = parent_repo.index.write_tree()
+        user = pygit2.Signature("Tasty Test", "test@tsrc.io")
+        master_ref = parent_repo.references.get("refs/heads/master")
+        last_commit = parent_repo.get(master_ref.target)
+        parents = [last_commit.oid]
+        parent_repo.create_commit(
+            "HEAD",
+            user,
+            user,
+            f"update subdmodule in {path}",
+            tree,
+            parents,
+        )
+        origin = parent_repo.remotes["origin"]
+        origin.push(["refs/heads/master"])
 
     def add_repo(
         self,

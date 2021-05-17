@@ -641,7 +641,7 @@ def test_sync_with_singular_remote(
     """Scenario:
     * Create a manifest that contains one repo with two remotes
       ('origin' and 'vpn')
-    * Marke sure that the 'origin' URL is valid but the 'vpn'
+    * Make sure that the 'origin' URL is valid but the 'vpn'
       URL is not.
     * Run 'tsrc init -r origin'
     * Check that 'tsrc sync' does not try and fetch the 'vpn' remote
@@ -804,3 +804,41 @@ class TestSyncWithGroups:
         assert (
             workspace_path / "bar"
         ).exists(), "bar should have been cloned when syncing group2"
+
+
+def test_sync_submodules(
+    tsrc_cli: CLI, git_server: GitServer, workspace_path: Path
+) -> None:
+    """
+    Scenario:
+    * Create repo 'sub1' containing a 'sub2' submodule
+    * Create a repo 'top' containing the 'sub1' submodule
+    * Add 'top' to the manifest
+    * Run `tsrc init`
+    * Create commit in sub2
+    * Update sub2 submodule in sub1
+    * Update sub1 submodule in sub2
+
+    * Run `tsrc sync`
+
+    * Check that everything was updated
+    """
+
+    git_server.add_repo("top")
+    sub1_url = git_server.add_repo("sub1", add_to_manifest=False)
+    sub2_url = git_server.add_repo("sub2", add_to_manifest=False)
+    git_server.add_submodule("sub1", url=sub2_url, path="sub2")
+    git_server.add_submodule("top", url=sub1_url, path="sub1")
+
+    tsrc_cli.run("init", git_server.manifest_url, "-r", "origin")
+
+    git_server.push_file("sub2", "new.txt")
+    git_server.update_submodule("sub1", "sub2")
+    git_server.update_submodule("top", "sub1")
+
+    tsrc_cli.run("sync")
+
+    clone_path = workspace_path / "top"
+
+    sub2_new_txt = clone_path / "sub1" / "sub2" / "new.txt"
+    assert sub2_new_txt.exists(), "sub2 was not updated"
