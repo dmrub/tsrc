@@ -344,8 +344,8 @@ def test_clone_submodules(
     git_server.add_repo("top")
     sub1_url = git_server.add_repo("sub1", add_to_manifest=False)
     sub2_url = git_server.add_repo("sub2", add_to_manifest=False)
-    git_server.add_submodule("sub1", url=sub2_url, path="sub2")
-    git_server.add_submodule("top", url=sub1_url, path="sub1")
+    git_server.add_submodule("sub1", url=sub2_url, path=Path("sub2"))
+    git_server.add_submodule("top", url=sub1_url, path=Path("sub1"))
 
     tsrc_cli.run("init", git_server.manifest_url, "-r", "origin")
 
