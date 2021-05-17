@@ -329,7 +329,7 @@ def test_singular_remote(
     assert output == "origin"
 
 
-def test_init_submodules(
+def test_clone_submodules(
     tsrc_cli: CLI, git_server: GitServer, workspace_path: Path
 ) -> None:
     """

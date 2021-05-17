@@ -806,7 +806,7 @@ class TestSyncWithGroups:
         ).exists(), "bar should have been cloned when syncing group2"
 
 
-def test_sync_submodules(
+def test_update_submodules(
     tsrc_cli: CLI, git_server: GitServer, workspace_path: Path
 ) -> None:
     """
